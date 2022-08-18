@@ -1,35 +1,31 @@
 from collections import OrderedDict
-import itertools
-import json
-import re
 import requests
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import pandas
-import time
 import numpy as np
-
 
 header1 = {
     'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
     'accept-encoding': 'gzip, deflate, br',
     'upgrade-insecure-requests': '1',
     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36'
-    }
+}
 header2 = {
     'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
     'accept-encoding': 'gzip, deflate, br',
     'upgrade-insecure-requests': '1',
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
-    }
+}
 header_list = [header1, header2]
 
-detailsTest = ["$3,199+ 2 bds", '$1,936+ 1 bd$2,968+ 2 bds', '$2,936+ 1 bd$3,554+ 2 bds$4,950+ 3 bds', 
+detailsTest = ["$3,199+ 2 bds", '$1,936+ 1 bd$2,968+ 2 bds', '$2,936+ 1 bd$3,554+ 2 bds$4,950+ 3 bds',
                '4 bds2 ba2,000 sqft- House for rent', 'Studio1 ba311 sqft- Apartment for rent']
 
-def get_requests(url:str, boo:bool):
+
+def get_requests(url: str, boo: bool):
     """ Creates a list of requests for the city and type of request the user inputs.
     5 different url's of zillows houses for rent or sale are created and turned into 
     requests via requests.Session. 
@@ -58,20 +54,19 @@ def get_input() -> list[str, str]:
     req = input('Type: for_sale, for_rent:\n').lower()
     return [city, req]
 
-def parse_soup(request, pageLists:list[dict]):
+
+def parse_soup(request, pageLists: list[dict]):
     """Pareses the list of pages for data we're interested in (address, price, size, link..etc)
 
     Args:
         request (page session): the page to parse through for data
         pageLists (list): a list of dictionaries containing the house info 
 
-    Returns:
-        _type_: _description_
     """
     soup = BeautifulSoup(request.content, 'html.parser')
     houses_info = soup.find_all(class_='list-card-info')
     if not houses_info:
-        return 
+        return
     for house in houses_info:
         # zillow puts a class at the end for more attributes that we dont want
         if house.find(class_='') == None:
@@ -81,24 +76,33 @@ def parse_soup(request, pageLists:list[dict]):
             details = house.find(class_='list-card-details').text.strip()
             price = house.find(class_='list-card-price').text.strip()
             link = house.find('a').get('href')
-            # zillow stores some links without the initial part when directing 
+            # zillow stores some links without the initial part when directing
             # the user to an appartment complex, so we add that on
             if link and link[0:22] != "https://www.zillow.com":
                 link = "https://www.zillow.com" + link
-            dict = {'price': price, 'address': address, 'details': details, 'link': link}
+            dict = {'price': price, 'address': address,
+                    'details': details, 'link': link}
             pageLists.append(dict)
         except Exception as err:
             print(err)
-        
+
+
 def write_to_file(file, df, city, search_type):
+    """Writes property info to text file
+
+    Args:
+        file (File): File containing property info
+        df (DataFrame): A dataframe containing all the property info
+        city (str): the city the user is interested in
+        search_type (str): the search type the user wanted
+    """
     if search_type == 'for_sale':
         file.write(f"{city} Homes for Sale:\n")
     else:
         file.write(f"{city} Homes/Appartments for Rent:\n")
     file.write(df.to_string())
 
-    
-    
+
 def main():
     input = get_input()
     city = input[0]
@@ -107,22 +111,21 @@ def main():
     boo = True
     pageLists = []
     # creates the requests one at a time after the last request has been processed
-    for pageNum in range(1,11):
-        url = (f'https://www.zillow.com/homes/{search_type}/{city}/{pageNum}_p')
+    for pageNum in range(1, 11):
+        url = (
+            f'https://www.zillow.com/homes/{search_type}/{city}/{pageNum}_p')
         request = get_requests(url, boo)
         parse_soup(request, pageLists)
         boo = not boo
     if not pageLists:
         print(print('No return from Zillow (captcha block)'))
         exit()
-    df = pandas.DataFrame(pageLists, columns=['price', 'address', 'details', 'link'])
+    df = pandas.DataFrame(pageLists, columns=[
+                          'price', 'address', 'details', 'link'])
     file = open('house_info.txt', 'w')
     write_to_file(file, df, city, search_type)
     file.close()
 
-    
+
 if __name__ == "__main__":
     main()
-
-
-
